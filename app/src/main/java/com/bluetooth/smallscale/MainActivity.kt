@@ -1,5 +1,10 @@
 package com.bluetooth.smallscale
 
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
@@ -20,15 +25,36 @@ class MainActivity : AppCompatActivity() {
 
     private var deviceId: String = ""
     private val FILE_NAME: String = "EncounterLog.txt"
+    private val reqPermissions = arrayOf(
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        android.Manifest.permission.BLUETOOTH_ADMIN,
+        android.Manifest.permission.BLUETOOTH,
+        android.Manifest.permission.ACCESS_FINE_LOCATION
+    )
+    private val bluetoothAdapter: BluetoothAdapter? by lazy(LazyThreadSafetyMode.NONE) {
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothManager.adapter
+    }
+    private val BluetoothAdapter.isDisabled: Boolean
+        get() = !isEnabled
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val REQUEST_ENABLE_BT = 1
+
         // Check for permissions
-        var reqPermissions: Array<String> = arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
         ActivityCompat.requestPermissions(this, reqPermissions, 0)
 
+        // Check if Bluetooth is available and enabled on the device
+        bluetoothAdapter?.takeIf { it.isDisabled }?.apply {
+            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT)
+        }
+
+        // OnClickListener for device id update button
         findViewById<Button>(R.id.update_id_button).setOnClickListener {
             deviceId = findViewById<TextInputEditText>(R.id.newId).text.toString()
             findViewById<TextView>(R.id.deviceIdText).text = "ID: "+deviceId
@@ -39,6 +65,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+
     fun isExternalStorageWritable(): Boolean {
         return if(Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
             Log.i("State","Yes, it is writable!")
@@ -48,7 +76,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Write the given message to /Download/fname
+    // Add the given message to /Download/fname
     fun writeFile(view: View, fname: String, msg: String) {
         if(isExternalStorageWritable()) {
             val newMsg: String = "\n"+msg
